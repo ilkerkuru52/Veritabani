@@ -1,0 +1,644 @@
+{
+  "name": "YouTube → Groq Özet + Quiz + Hafızalı Sohbet",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ytube",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "0744fdf2-097c-4f64-82fa-50de0bf3409e",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "9024e29e-9080-4cf5-9a6b-0d918468f195",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "youtubeUrl",
+              "type": "string",
+              "value": "={{ $json.body.youtubeUrl }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "47392441-33e3-4069-b1bd-a8a697c5e031",
+      "name": "Get YouTube URL",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        208,
+        0
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "jsCode": "const extractYoutubeId = (url) => {\n  const pattern = /(?:youtube\\.com\\/(?:[^\\/]+\\/.+\\/|(?:v|e(?:mbed)?)\\/|.*[?&]v=)|youtu\\.be\\/)([^\"&?\\/\\s]{11})/;\n  const match = url.match(pattern);\n  return match ? match[1] : null;\n};\nconst youtubeUrl = items[0].json.youtubeUrl;\nreturn [{ json: { videoId: extractYoutubeId(youtubeUrl), youtubeUrl } }];"
+      },
+      "id": "5e31f929-30ec-4a70-b358-22cc7e6302ed",
+      "name": "YouTube Video ID",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        400,
+        0
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "get",
+        "videoId": "={{ $json.videoId }}",
+        "options": {}
+      },
+      "id": "599f617a-11a7-47c1-a992-fe7468b07789",
+      "name": "Get YouTube Video",
+      "type": "n8n-nodes-base.youTube",
+      "position": [
+        608,
+        0
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "ZnAIM2koznxNfF2X",
+          "name": "YouTube account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "5bc12cd6-4fe4-41d0-9684-f774a1060a22",
+      "name": "YouTube Transcript",
+      "type": "n8n-nodes-youtube-transcription.youtubeTranscripter",
+      "position": [
+        800,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "transcript",
+        "options": {}
+      },
+      "id": "734ab123-dc83-4038-b991-1c3400ded631",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        208,
+        224
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "aggregation": "concatenate",
+              "field": "text",
+              "separateBy": " "
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "75e9291d-5936-4770-9cd0-dfc709862783",
+      "name": "Concatenate",
+      "type": "n8n-nodes-base.summarize",
+      "position": [
+        400,
+        224
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = items[0].json.concatenated_text || '';\nconst MAX = 12000;\nconst text = raw.length > MAX\n  ? raw.slice(0, MAX) + '\\n\\n[Transkript çok uzundu, ilk bölüm alındı]'\n  : raw;\nreturn [{ json: { ...items[0].json, trimmed_text: text } }];"
+      },
+      "id": "30695ae8-4ae5-42b5-a15f-a28170d95da4",
+      "name": "Chunk If Long",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        608,
+        224
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "7d13be48-ca53-4b15-9c82-32cc9e72e17e",
+      "name": "Groq — Özet",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        800,
+        224
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "6YekEZCHakl4jAtR",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "89a3e852-fbf9-4799-96cb-06d49c3f1a1a",
+      "name": "Groq — Quiz",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        800,
+        432
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "6YekEZCHakl4jAtR",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Groq cevaplarını birleştir\nconst summary = $('Groq — Özet').item.json.choices?.[0]?.message?.content || 'Özet alınamadı.';\nconst quiz    = $('Groq — Quiz').item.json.choices?.[0]?.message?.content || 'Quiz üretilemedi.';\nconst video   = $('Get YouTube Video').item.json;\nconst webhook = $('Webhook').item.json;\n\nconst title      = video.snippet?.title || 'Başlık yok';\nconst youtubeUrl = webhook.body?.youtubeUrl || '';\nconst channelTitle = video.snippet?.channelTitle || '';\n\n// ── Hafıza: özeti workflow static data'ya kaydet ──\n// Bu sayede sohbet webhook'u özete erişebilir\nconst staticData = $getWorkflowStaticData('global');\nstaticData.lastSummary  = summary;\nstaticData.lastTitle    = title;\nstaticData.lastUrl      = youtubeUrl;\nstaticData.chatHistory  = [];  // Yeni video → sohbet geçmişini sıfırla\n\nreturn [{ json: { summary, quiz, title, youtubeUrl, channelTitle, id: video.id } }];"
+      },
+      "id": "00e16c3f-73f0-4c9d-bc2f-d8f4f72bff30",
+      "name": "Merge + Hafızaya Kaydet",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1008,
+        320
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "text": "=📺 <b>{{ $json.title }}</b>\n🔗 {{ $json.youtubeUrl }}\n📡 {{ $json.channelTitle }}\n\n{{ $json.summary }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "de0c6702-d68f-463a-9e2d-72be8ef3a92c",
+      "name": "Telegram — Özet",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1200,
+        224
+      ],
+      "typeVersion": 1.2,
+      "webhookId": "b2885b88-1039-4e4e-9740-869398fdcd91"
+    },
+    {
+      "parameters": {
+        "text": "=🧠 <b>Quiz — {{ $json.title }}</b>\n\n{{ $json.quiz }}\n\n💬 Bu video hakkında soru sormak için Telegram'da yaz!",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "21aa2a1d-a8c5-4f85-90e9-0acbafcd526e",
+      "name": "Telegram — Quiz",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1200,
+        432
+      ],
+      "typeVersion": 1.2,
+      "webhookId": "10f476de-6549-42d6-81cc-8bc32f2481f7"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ summary: $json.summary, quiz: $json.quiz, title: $json.title, youtubeUrl: $json.youtubeUrl }) }}",
+        "options": {}
+      },
+      "id": "67cfa9bf-9dc4-42be-8e97-a074cced8801",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1200,
+        64
+      ],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram-chat",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "742034d9-182f-4343-bc71-817031041f18",
+      "name": "Webhook — Telegram Sohbet",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        688
+      ],
+      "webhookId": "telegram-chat-webhook",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const body      = items[0].json.body || items[0].json;\nconst message   = body.message || {};\nconst userText  = message.text || '';\nconst chatId    = message.chat?.id?.toString() || '';\nconst firstName = message.from?.first_name || 'Kullanıcı';\nconst isStart   = userText === '/start';\nreturn [{ json: { chatId, userText, firstName, isStart } }];"
+      },
+      "id": "e3046ffe-a186-44c0-bcc8-30f4130e0c08",
+      "name": "Parse Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        224,
+        688
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isStart }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "7b3f5c86-438e-43f1-8ce9-a28c15778f59",
+      "name": "Start mı Soru mu?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        448,
+        688
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=👋 Merhaba <b>{{ $json.firstName }}</b>!\n\nBen YouTube öğrenme asistanınım 🎓\n\nBir video analiz ettirdikten sonra buradan soru sorabilirsin — özeti ve konuyu hatırlıyorum!\n\n<i>Henüz video analiz edilmediyse önce webhook'a link gönder.</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "5636933f-a87a-4c67-93c4-cdc9662f006c",
+      "name": "Telegram — Hoş Geldin",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        672,
+        592
+      ],
+      "typeVersion": 1.2,
+      "webhookId": "7a56d2ac-e94b-4be1-8ac3-1583a0cbe86c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Static data'dan hafızayı oku ──\nconst staticData = $getWorkflowStaticData('global');\nconst summary     = staticData.lastSummary  || null;\nconst title       = staticData.lastTitle    || null;\nconst url         = staticData.lastUrl      || null;\nconst history     = staticData.chatHistory  || [];\n\nconst userText    = items[0].json.userText;\nconst chatId      = items[0].json.chatId;\n\n// ── Sistem promptu: özeti enjekte et ──\nlet systemPrompt = 'Sen bir eğitim asistanısın. Kullanıcı seninle YouTube videoları hakkında konuşuyor.\\n\\nKısa, anlaşılır, teşvik edici cevaplar ver. Türkçe konuş. Maksimum 3 paragraf.';\n\nif (summary && title) {\n  systemPrompt += `\\n\\n━━━ EN SON ANALİZ EDİLEN VİDEO ━━━\\nBaşlık: ${title}\\nURL: ${url}\\n\\nVİDEO ÖZETİ:\\n${summary}\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n\\nKullanıcı bu video hakkında soru soruyorsa yukarıdaki özete dayanarak cevapla.`;\n}\n\n// ── Mesaj geçmişini hazırla (son 10 mesaj = 5 tur) ──\n// Her tur: {role:'user', content:...}, {role:'assistant', content:...}\nconst MAX_TURNS = 10; // 5 kullanıcı + 5 asistan\nconst recentHistory = history.slice(-MAX_TURNS);\n\n// ── Mevcut kullanıcı mesajını geçmişe ekle ──\nconst updatedHistory = [...history, { role: 'user', content: userText }];\n// Son MAX_TURNS+1 tut (yeni mesaj dahil)\nstaticData.chatHistory = updatedHistory.slice(-(MAX_TURNS + 1));\n\n// ── Groq'a gönderilecek messages dizisi ──\nconst messages = [\n  { role: 'system', content: systemPrompt },\n  ...recentHistory,\n  { role: 'user', content: userText }\n];\n\nreturn [{ json: { messages, chatId, userText } }];"
+      },
+      "id": "b7649bea-b3ec-4e4f-9c86-bf4aa073be1d",
+      "name": "Hafızadan Bağlamı Oluştur",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        672,
+        784
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "2fc18e0c-ba09-432b-9301-235a17e2e58a",
+      "name": "Groq — Hafızalı Sohbet",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        784
+      ],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "6YekEZCHakl4jAtR",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Groq'un cevabını geçmişe ekle\nconst reply = items[0].json.choices?.[0]?.message?.content || 'Cevap alınamadı.';\nconst chatId = $('Hafızadan Bağlamı Oluştur').item.json.chatId;\n\nconst staticData = $getWorkflowStaticData('global');\nconst history = staticData.chatHistory || [];\n\n// Asistan cevabını geçmişe ekle, son 10 tut\nstaticData.chatHistory = [...history, { role: 'assistant', content: reply }].slice(-10);\n\nreturn [{ json: { reply, chatId } }];"
+      },
+      "id": "cc8003cf-2038-4338-9251-577541db1f06",
+      "name": "Asistan Cevabını Kaydet",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1088,
+        784
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.reply }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "d1f1f249-2e71-43e3-87e3-250491875849",
+      "name": "Telegram — Cevabı Gönder",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1280,
+        784
+      ],
+      "typeVersion": 1.2,
+      "webhookId": "3afef24b-47be-420d-bfae-7e29585acb5d"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get YouTube URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get YouTube URL": {
+      "main": [
+        [
+          {
+            "node": "YouTube Video ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube Video ID": {
+      "main": [
+        [
+          {
+            "node": "Get YouTube Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get YouTube Video": {
+      "main": [
+        [
+          {
+            "node": "YouTube Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube Transcript": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Concatenate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concatenate": {
+      "main": [
+        [
+          {
+            "node": "Chunk If Long",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunk If Long": {
+      "main": [
+        [
+          {
+            "node": "Groq — Özet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Groq — Quiz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq — Özet": {
+      "main": [
+        [
+          {
+            "node": "Merge + Hafızaya Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge + Hafızaya Kaydet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram — Özet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram — Quiz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook — Telegram Sohbet": {
+      "main": [
+        [
+          {
+            "node": "Parse Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Start mı Soru mu?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start mı Soru mu?": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Hoş Geldin",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hafızadan Bağlamı Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hafızadan Bağlamı Oluştur": {
+      "main": [
+        [
+          {
+            "node": "Groq — Hafızalı Sohbet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq — Hafızalı Sohbet": {
+      "main": [
+        [
+          {
+            "node": "Asistan Cevabını Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asistan Cevabını Kaydet": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Cevabı Gönder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "db803e1f-4a00-419f-afdc-685eecfe5e9a",
+  "meta": {
+    "instanceId": "a3f0c39b6468c039ef4687c9b22d31a224d14d969ecac4efa2b6ffd0b01c6b77"
+  },
+  "id": "2AXam10NRUhusuPp",
+  "tags": []
+}
