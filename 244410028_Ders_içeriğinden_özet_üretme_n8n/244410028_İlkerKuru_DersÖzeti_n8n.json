@@ -1,5 +1,5 @@
 {
-  "name": "YouTube AI Master - Final v6",
+  "name": "YouTube AI Master - v7 Final",
   "nodes": [
     {
       "parameters": {
@@ -66,7 +66,7 @@
           "mode": "id",
           "value": "YOUR_TABLE_ID"
         },
-        "filterByFormula": "={user_id} = \"{{ $json.userId }}\"",
+        "filterByFormula": "{user_id} = \"{{ $json.userId }}\"",
         "options": {
           "sort": [
             {
@@ -94,7 +94,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst msg = (data.msg || '').trim();\nconst sessionId = data.sessionId;\nconst userId = data.userId;\nconst chatId = data.chatId;\nconst source = data.source;\n\nconst last = $input.all()[1]?.json?.fields || {};\nconst lastVideoId = last.video_id || null;\nconst lastTests = last.test_sorulari ? JSON.parse(last.test_sorulari) : [];\n\nconst ytRegex = /(?:https?:\\/\\/)?(?:www\\.)?(?:youtube\\.com\\/(?:watch\\?v=|embed\\/|shorts\\/|live\\/)|youtu\\.be\\/)([\\w-]{11})/;\nconst match = msg.match(ytRegex);\nconst videoId = match ? match[1] : null;\n\nconst lower = msg.toLowerCase().trim();\nlet intent = 'soru';\n\nif (videoId) intent = 'youtube';\nelse if (lower.startsWith('/help') || lower.startsWith('/start')) intent = 'help';\nelse if (lower.startsWith('/history')) intent = 'history';\nelse if (lower.match(/^[a-d][\\.\\)]/i) && lastTests.length > 0) intent = 'test_cevap';\nelse if (lower.includes('test') || lower.includes('quiz') || lower.includes('soru')) intent = 'test_iste';\nelse if (lower.includes('özet') || lower.includes('ozet') || lower.includes('summary')) intent = 'ozet_iste';\nelse if (lower.includes('sade') || lower.includes('basit') || lower.includes('kolay') || lower.includes('simple')) intent = 'sade_anlat';\nelse if (lower.includes('detay') || lower.includes('derin') || lower.includes('ileri') || lower.includes('advanced')) intent = 'derin_anlat';\nelse if (lower.includes('ingilizce') || lower.includes('english')) intent = 'ingilizce';\nelse if (lower.includes('5 yaş') || lower.includes('çocuk') || lower.includes('cocuk')) intent = 'cocuk';\n\nreturn [{ json: { msg, sessionId, userId, chatId, source, videoId, intent, lastVideoId, lastTests, lastTitle: last.title || '', lastOzet: last.ozet || '', lastDers: last.ders_anlatimi || '[]', lastKavramlar: last.anahtar_kavramlar || '' }}];"
+        "jsCode": "const prev = $('Normalize Input').first().json;\nconst msg  = (prev.msg || '').trim();\nconst { sessionId, userId, chatId, source } = prev;\n\nconst lastRec = $input.first()?.json?.fields || {};\nconst lastVideoId = lastRec.video_id || null;\n\nlet lastTests = [];\ntry { lastTests = lastRec.test_sorulari ? JSON.parse(lastRec.test_sorulari) : []; }\ncatch(e) { lastTests = []; }\n\nlet lastDers = '[]';\ntry { if (lastRec.ders_anlatimi) JSON.parse(lastRec.ders_anlatimi); lastDers = lastRec.ders_anlatimi || '[]'; }\ncatch(e) { lastDers = '[]'; }\n\nconst ytStrictRegex = /(?:youtube\\.com\\/(?:watch\\?v=|embed\\/|shorts\\/|live\\/)|youtu\\.be\\/)([\\w-]{11})/;\nconst match   = msg.match(ytStrictRegex);\nconst videoId = match ? match[1] : null;\n\nconst lower = msg.toLowerCase().trim();\nlet intent = 'soru';\n\nif      (videoId)                                                              intent = 'youtube';\nelse if (lower.startsWith('/help') || lower.startsWith('/start'))             intent = 'help';\nelse if (lower.startsWith('/history'))                                         intent = 'history';\nelse if (/^[a-d][.)]\\s*$/i.test(lower) && lastTests.length > 0)              intent = 'test_cevap';\nelse if (lower.includes('test') || lower.includes('quiz'))                    intent = 'test_iste';\nelse if (lower.includes('özet') || lower.includes('ozet') || lower.includes('summary')) intent = 'ozet_iste';\nelse if (lower.includes('sade') || lower.includes('basit') || lower.includes('kolay') || lower.includes('simple')) intent = 'sade_anlat';\nelse if (lower.includes('detay') || lower.includes('derin') || lower.includes('ileri') || lower.includes('advanced')) intent = 'derin_anlat';\nelse if (lower.includes('ingilizce') || lower.includes('english'))            intent = 'ingilizce';\nelse if (lower.includes('5 yaş') || lower.includes('çocuk') || lower.includes('cocuk')) intent = 'cocuk';\n\nreturn [{ json: {\n  msg, sessionId, userId, chatId, source,\n  videoId, intent, lastVideoId, lastTests,\n  lastTitle:    lastRec.title           || '',\n  lastOzet:     lastRec.ozet            || '',\n  lastDers,\n  lastKavramlar: lastRec.anahtar_kavramlar || ''\n}}];"
       },
       "id": "analyze",
       "name": "Message Analyze",
@@ -219,7 +219,10 @@
           ]
         },
         "options": {
-          "timeout": 60000
+          "timeout": 60000,
+          "retry": true,
+          "maxTries": 3,
+          "waitBetweenTries": 5000
         }
       },
       "id": "supadata",
@@ -233,7 +236,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst prev = $('Message Analyze').first().json;\n\nlet transcript = '';\nlet lang = 'tr';\n\nif (Array.isArray(input.content)) {\n  transcript = input.content.map(s => s.text).join(' ');\n  lang = input.language || 'tr';\n} else if (typeof input.content === 'string') {\n  transcript = input.content;\n} else if (input.transcript) {\n  transcript = Array.isArray(input.transcript) ? input.transcript.map(s => s.text).join(' ') : input.transcript;\n}\n\nif (transcript.length > 150000) transcript = transcript.substring(0, 150000) + '\\n\\n[...]';\n\nreturn [{ json: { ...prev, transcript, lang, charCount: transcript.length } }];"
+        "jsCode": "const input = $input.first().json;\nconst prev  = $('Message Analyze').first().json;\n\nlet transcript = '';\nlet lang = 'tr';\n\nif (Array.isArray(input.content)) {\n  transcript = input.content.map(s => (s.text || '')).join(' ');\n  lang = input.language || 'tr';\n} else if (typeof input.content === 'string') {\n  transcript = input.content;\n} else if (input.transcript) {\n  transcript = Array.isArray(input.transcript)\n    ? input.transcript.map(s => (s.text || '')).join(' ')\n    : String(input.transcript);\n}\n\ntranscript = transcript.trim();\nif (!transcript) {\n  return [{ json: { ...prev, error: true, output: '⚠️ Bu video için transkript bulunamadı. Altyazı kapalı olabilir.', transcript: '', lang, charCount: 0 }}];\n}\n\nif (transcript.length > 150000) transcript = transcript.substring(0, 150000) + '\\n\\n[...]';\n\nreturn [{ json: { ...prev, transcript, lang, charCount: transcript.length }}];"
       },
       "id": "proc-trans",
       "name": "Process Transcript",
@@ -257,14 +260,14 @@
           "mode": "id",
           "value": "YOUR_TABLE_ID"
         },
-        "filterByFormula": "={video_id} = \"{{ $json.videoId }}\""
+        "filterByFormula": "{video_id} = \"{{ $json.videoId }}\""
       },
       "id": "check-cache",
       "name": "Check Cache",
       "type": "n8n-nodes-base.airtable",
       "typeVersion": 2,
       "position": [
-        1540,
+        1760,
         200
       ],
       "credentials": {
@@ -296,20 +299,20 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1760,
+        1980,
         200
       ]
     },
     {
       "parameters": {
-        "jsCode": "const rec = $input.first().json.fields;\nconst prev = $('Message Analyze').first().json;\n\nreturn [{ json: {\n  ...prev,\n  cached: true,\n  title: rec.title || 'Başlıksız',\n  seviye: rec.seviye || '',\n  ozet: rec.ozet || '',\n  summary: rec.summary || '',\n  parsedLesson: {\n    video_konusu: rec.title || '',\n    seviye: rec.seviye || '',\n    ozet: rec.ozet || '',\n    ders_anlatimi: JSON.parse(rec.ders_anlatimi || '[]'),\n    test_sorulari: JSON.parse(rec.test_sorulari || '[]'),\n    pratik_uygulamalar: JSON.parse(rec.pratik_uygulamalar || '[]'),\n    anahtar_kavramlar: JSON.parse(rec.anahtar_kavramlar || '[]')\n  }\n}}];"
+        "jsCode": "const raw = $input.first().json;\nconst rec  = raw.fields || raw;\nconst prev = $('Message Analyze').first().json;\n\nfunction safeparse(s, fallback) {\n  try { return s ? JSON.parse(s) : fallback; }\n  catch(e) { return fallback; }\n}\n\nconst ders_anlatimi      = safeparse(rec.ders_anlatimi,      []);\nconst test_sorulari      = safeparse(rec.test_sorulari,      []);\nconst pratik_uygulamalar = safeparse(rec.pratik_uygulamalar, []);\nconst anahtar_kavramlar  = safeparse(rec.anahtar_kavramlar,  []);\n\nconst parsedLesson = {\n  video_konusu: rec.title || '',\n  seviye:       rec.seviye || '',\n  ozet:         rec.ozet   || '',\n  ders_anlatimi,\n  test_sorulari,\n  pratik_uygulamalar,\n  anahtar_kavramlar\n};\n\n// Formatlı mesaj üret (Format Lesson ile aynı mantık)\nconst kavramlar = anahtar_kavramlar.map(k => `\\`${k}\\``).join(' · ');\nconst anlatim   = ders_anlatimi.map((b, i) =>\n  `*${i+1}. ${b.baslik}*\\n${b.icerik}${b.onemli_not ? `\\n💡 *Not:* ${b.onemli_not}` : ''}`\n).join('\\n\\n');\nconst pratik    = pratik_uygulamalar.map((u, i) => `${i+1}. ${u}`).join('\\n');\nconst testler   = test_sorulari.map((q, i) => {\n  const opts = Object.entries(q.secenekler || {}).map(([k,v]) => `*${k})* ${v}`).join('  |  ');\n  return `*Soru ${i+1}:* ${q.soru}\\n\\n${opts}\\n\\nCevap: ||${q.dogru_cevap} - ${q.aciklama}||`;\n}).join('\\n\\n---\\n\\n');\n\nconst output = `🎓 *${rec.title || prev.videoId}* _(önbellekten)_\\n> Seviye: ${rec.seviye || '-'}\\n\\n*🔑 Kavramlar:* ${kavramlar || '-'}\\n\\n*📝 Özet*\\n${rec.ozet || '-'}\\n\\n*📖 Konu Anlatımı*\\n${anlatim || '-'}\\n\\n*🛠️ Pratik*\\n${pratik || '-'}\\n\\n*🧪 Testler*\\n${testler || '-'}\\n\\n💬 _Soru sorabilir veya A/B/C/D yazabilirsin._`;\n\nreturn [{ json: {\n  ...prev,\n  cached: true,\n  title:  rec.title  || 'Başlıksız',\n  seviye: rec.seviye || '',\n  ozet:   rec.ozet   || '',\n  output,\n  parsedLesson\n}}];"
       },
       "id": "from-cache",
       "name": "From Cache",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1980,
+        2200,
         100
       ]
     },
@@ -335,8 +338,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1760,
-        340
+        2200,
+        320
       ]
     },
     {
@@ -371,7 +374,12 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\\n  \"model\": \"openai/gpt-4o-mini\",\\n  \"messages\": [\\n    {\\n      \"role\": \"system\",\\n      \"content\": \"Sen bir video transkript parçasını özetleyen uzman asistansın. Sadece bu parçanın ana fikirlerini, kavramlarını ve önemli noktalarını 3-7 madde halinde Türkçe özetle. Teknik terimleri koru. Düz metin yaz.\"\\n    },\\n    {\\n      \"role\": \"user\",\\n      \"content\": \"Parça {{ $json.chunkIndex + 1 }}/{{ $json.totalChunks }} (Video: {{ $json.videoId }}):\\n\\n{{ $json.currentChunk }}\"\\n    }\\n  ],\\n  \"max_tokens\": 800,\\n  \"temperature\": 0.2\\n}"
+        "jsonBody": "={\\n  \"model\": \"openai/gpt-4o-mini\",\\n  \"messages\": [\\n    {\\n      \"role\": \"system\",\\n      \"content\": \"Sen bir video transkript parçasını özetleyen uzman asistansın. Sadece bu parçanın ana fikirlerini, kavramlarını ve önemli noktalarını 3-7 madde halinde Türkçe özetle. Teknik terimleri koru. Düz metin yaz.\"\\n    },\\n    {\\n      \"role\": \"user\",\\n      \"content\": \"Parça {{ $json.chunkIndex + 1 }}/{{ $json.totalChunks }} (Video: {{ $json.videoId }}):\\n\\n{{ $json.currentChunk }}\"\\n    }\\n  ],\\n  \"max_tokens\": 800,\\n  \"temperature\": 0.2\\n}",
+        "options": {
+          "retry": true,
+          "maxTries": 3,
+          "waitBetweenTries": 5000
+        }
       },
       "id": "chunk-llm",
       "name": "Chunk LLM",
@@ -398,7 +406,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.first().json;\nconst sums = items.summaries || [];\nconst base = $input.all()[0]?.json || {};\n\nconst combined = sums.map((s, i) => {\n  const c = s?.choices?.[0]?.message?.content || s?.message?.content || '';\n  return `Bölüm ${i+1}:\\n${c}`;\n}).join('\\n\\n---\\n\\n');\n\nreturn [{ json: { ...base, combinedSummary: combined } }];"
+        "jsCode": "const agg  = $input.first().json;\nconst sums = agg.summaries || [];\n\n// base context: Aggregate öncesinden birini al\nconst base = sums[0] || {};\n\nconst combined = sums.map((s, i) => {\n  const c = s?.choices?.[0]?.message?.content || s?.message?.content || '';\n  return `Bölüm ${i+1}:\\n${c}`;\n}).join('\\n\\n---\\n\\n');\n\n// Message Analyze'dan orijinal meta veriyi al\nconst meta = $('Message Analyze').first().json;\n\nreturn [{ json: { ...meta, combinedSummary: combined, totalChunks: sums.length, transcript: '' }}];"
       },
       "id": "merge-chunks",
       "name": "Merge Chunks",
@@ -428,7 +436,12 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\\n  \"model\": \"openai/gpt-4o\",\\n  \"messages\": [\\n    {\\n      \"role\": \"system\",\\n      \"content\": \"Sen Türkçe konuşan, eğitim odaklı bir YouTube analiz uzmanısın. Sana video transkript/özet verilecek. Aşağıdaki JSON yapısını SADECE döndür, başka hiçbir şey yazma:\\n\\n{\\n  \\\"video_konusu\\\": \\\"kısa başlık\\\",\\n  \\\"hedef_kitle\\\": \\\"kimin için uygun\\\",\\n  \\\"seviye\\\": \\\"Başlangıç / Orta / İleri\\\",\\n  \\\"sure_ozet\\\": \\\"X dakikada şunu öğreneceksin\\\",\\n  \\\"anahtar_kavramlar\\\": [\\\"k1\\\",\\\"k2\\\",\\\"k3\\\",\\\"k4\\\",\\\"k5\\\"],\\n  \\\"on_bilgi\\\": [\\\"ön bilgi 1\\\",\\\"ön bilgi 2\\\"],\\n  \\\"ozet\\\": \\\"4-6 paragraf detaylı özet\\\",\\n  \\\"ders_anlatimi\\\": [\\n    {\\\"baslik\\\":\\\"Bölüm 1\\\",\\\"icerik\\\":\\\"200-300 kelime\\\",\\\"onemli_not\\\":\\\"dikkat edilecek nokta\\\"},\\n    {\\\"baslik\\\":\\\"Bölüm 2\\\",\\\"icerik\\\":\\\"...\\\",\\\"onemli_not\\\":\\\"...\\\"},\\n    {\\\"baslik\\\":\\\"Bölüm 3\\\",\\\"icerik\\\":\\\"...\\\",\\\"onemli_not\\\":\\\"...\"}\\n  ],\\n  \\\"pratik_uygulamalar\\\": [\\\"uyg1\\\",\\\"uyg2\\\",\\\"uyg3\\\"],\\n  \\\"test_sorulari\\\": [\\n    {\\\"soru\\\":\\\"...\\\",\\\"secenekler\\\":{\\\"A\\\":\\\"...\\\",\\\"B\\\":\\\"...\\\",\\\"C\\\":\\\"...\\\",\\\"D\\\":\\\"...\\\"},\\\"dogru_cevap\\\":\\\"A\\\",\\\"aciklama\\\":\\\"...\\\"}\\n  ],\\n  \\\"ilgili_konular\\\": [\\\"konu1\\\",\\\"konu2\\\"]\\n}\"\\n    },\\n    {\\n      \"role\": \"user\",\\n      \"content\": \"META: Video {{ $json.videoId }}, Dil: {{ $json.lang }}\\n\\nİÇERİK ({{ $json.totalChunks }} bölüm):\\n{{ $json.combinedSummary || $json.transcript }}\"\\n    }\\n  ],\\n  \"max_tokens\": 4000,\\n  \"temperature\": 0.25,\\n  \"response_format\": {\\\"type\\\": \\\"json_object\\\"}\\n}"
+        "jsonBody": "={\\n  \"model\": \"openai/gpt-4o\",\\n  \"messages\": [\\n    {\\n      \"role\": \"system\",\\n      \"content\": \"Sen Türkçe konuşan, eğitim odaklı bir YouTube analiz uzmanısın. Sana video transkript/özet verilecek. Aşağıdaki JSON yapısını SADECE döndür, başka hiçbir şey yazma:\\n\\n{\\n  \\\"video_konusu\\\": \\\"kısa başlık\\\",\\n  \\\"hedef_kitle\\\": \\\"kimin için uygun\\\",\\n  \\\"seviye\\\": \\\"Başlangıç / Orta / İleri\\\",\\n  \\\"sure_ozet\\\": \\\"X dakikada şunu öğreneceksin\\\",\\n  \\\"anahtar_kavramlar\\\": [\\\"k1\\\",\\\"k2\\\",\\\"k3\\\",\\\"k4\\\",\\\"k5\\\"],\\n  \\\"on_bilgi\\\": [\\\"ön bilgi 1\\\",\\\"ön bilgi 2\\\"],\\n  \\\"ozet\\\": \\\"4-6 paragraf detaylı özet\\\",\\n  \\\"ders_anlatimi\\\": [\\n    {\\\"baslik\\\":\\\"Bölüm 1\\\",\\\"icerik\\\":\\\"200-300 kelime\\\",\\\"onemli_not\\\":\\\"dikkat edilecek nokta\\\"},\\n    {\\\"baslik\\\":\\\"Bölüm 2\\\",\\\"icerik\\\":\\\"...\\\",\\\"onemli_not\\\":\\\"...\\\"},\\n    {\\\"baslik\\\":\\\"Bölüm 3\\\",\\\"icerik\\\":\\\"...\\\",\\\"onemli_not\\\":\\\"...\"}\\n  ],\\n  \\\"pratik_uygulamalar\\\": [\\\"uyg1\\\",\\\"uyg2\\\",\\\"uyg3\\\"],\\n  \\\"test_sorulari\\\": [\\n    {\\\"soru\\\":\\\"...\\\",\\\"secenekler\\\":{\\\"A\\\":\\\"...\\\",\\\"B\\\":\\\"...\\\",\\\"C\\\":\\\"...\\\",\\\"D\\\":\\\"...\\\"},\\\"dogru_cevap\\\":\\\"A\\\",\\\"aciklama\\\":\\\"...\\\"}\\n  ],\\n  \\\"ilgili_konular\\\": [\\\"konu1\\\",\\\"konu2\\\"]\\n}\"\\n    },\\n    {\\n      \"role\": \"user\",\\n      \"content\": \"META: Video {{ $json.videoId }}, Dil: {{ $json.lang }}\\n\\nİÇERİK ({{ $json.totalChunks }} bölüm):\\n{{ $json.combinedSummary || $json.transcript }}\"\\n    }\\n  ],\\n  \"max_tokens\": 4000,\\n  \"temperature\": 0.25,\\n  \"response_format\": {\\\"type\\\": \\\"json_object\\\"}\\n}",
+        "options": {
+          "retry": true,
+          "maxTries": 3,
+          "waitBetweenTries": 5000
+        }
       },
       "id": "ai-lesson",
       "name": "AI Lesson",
@@ -441,7 +454,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ai = $input.first().json;\nconst base = $input.all()[0]?.json || {};\n\nlet content = ai?.choices?.[0]?.message?.content || ai?.message?.content || '';\nconst m = content.match(/\\{[\\s\\S]*\\}/);\nif (!m) return [{ json: { error: true, output: 'AI yanıtı hatalı.', ...base }}];\n\nlet p;\ntry { p = JSON.parse(m[0]); }\ncatch(e) { try { p = JSON.parse(m[0].replace(/,\\s*}/g,'}').replace(/,\\s*]/g,']')); } catch(e2) { return [{ json: { error: true, output: 'JSON hatası: '+e2.message, ...base }}]; }\n}\n\nconst kavramlar = (p.anahtar_kavramlar||[]).map(k=>`\\`${k}\\``).join(' · ');\nconst onbilgi = (p.on_bilgi||[]).map(b=>`- ${b}`).join('\\n');\nconst anlatim = (p.ders_anlatimi||[]).map((b,i)=>`*${i+1}. ${b.baslik}*\\n${b.icerik}\\n${b.onemli_not?`💡 *Not:* ${b.onemli_not}`:''}`).join('\\n\\n');\nconst pratik = (p.pratik_uygulamalar||[]).map((u,i)=>`${i+1}. ${u}`).join('\\n');\nconst testler = (p.test_sorulari||[]).map((q,i)=>{\n  const opts = Object.entries(q.secenekler||{}).map(([k,v])=>`*${k})* ${v}`).join('  |  ');\n  return `*Soru ${i+1}:* ${q.soru}\\n\\n${opts}\\n\\nCevap: ||${q.dogru_cevap} - ${q.aciklama}||`;\n}).join('\\n\\n---\\n\\n');\n\nconst msg = `🎓 *${p.video_konusu||base.videoId}*\\n> Seviye: ${p.seviye} | Hedef: ${p.hedef_kitle}\\n\\n*⏱️ ${p.sure_ozet}*\\n\\n*🔑 Kavramlar:* ${kavramlar}\\n\\n*📚 Ön bilgi:*\\n${onbilgi}\\n\\n*📝 Özet*\\n${p.ozet}\\n\\n*📖 Konu Anlatımı*\\n${anlatim}\\n\\n*🛠️ Pratik*\\n${pratik}\\n\\n*🧪 Testler*\\n${testler}\\n\\n*🔍 Araştır*\\n${(p.ilgili_konular||[]).map(k=>`- ${k}`).join('\\n')}\\n\\n💬 _Soru sorabilir veya A/B/C/D yazabilirsin._`;\n\nreturn [{ json: { ...base, error: false, output: msg, title: p.video_konusu, seviye: p.seviye, ozet: p.ozet, parsedLesson: p }}];"
+        "jsCode": "const ai   = $input.first().json;\nconst base = $('Message Analyze').first().json;\n\nlet content = ai?.choices?.[0]?.message?.content || ai?.message?.content || '';\n\n// JSON objesini çıkart\nconst m = content.match(/\\{[\\s\\S]*\\}/);\nif (!m) return [{ json: { ...base, error: true, output: '⚠️ AI yapılandırılmış veri döndürmedi. Tekrar deneyin.' }}];\n\nlet p;\ntry {\n  p = JSON.parse(m[0]);\n} catch(e) {\n  try {\n    p = JSON.parse(m[0].replace(/,\\s*}/g, '}').replace(/,\\s*]/g, ']'));\n  } catch(e2) {\n    return [{ json: { ...base, error: true, output: `⚠️ JSON parse hatası: ${e2.message}` }}];\n  }\n}\n\nconst kavramlar = (p.anahtar_kavramlar || []).map(k => `\\`${k}\\``).join(' · ');\nconst onbilgi   = (p.on_bilgi          || []).map(b => `- ${b}`).join('\\n');\nconst anlatim   = (p.ders_anlatimi     || []).map((b, i) =>\n  `*${i+1}. ${b.baslik}*\\n${b.icerik}${b.onemli_not ? `\\n💡 *Not:* ${b.onemli_not}` : ''}`\n).join('\\n\\n');\nconst pratik    = (p.pratik_uygulamalar || []).map((u, i) => `${i+1}. ${u}`).join('\\n');\nconst testler   = (p.test_sorulari     || []).map((q, i) => {\n  const opts = Object.entries(q.secenekler || {}).map(([k,v]) => `*${k})* ${v}`).join('  |  ');\n  return `*Soru ${i+1}:* ${q.soru}\\n\\n${opts}\\n\\nCevap: ||${q.dogru_cevap} - ${q.aciklama}||`;\n}).join('\\n\\n---\\n\\n');\n\nconst output = `🎓 *${p.video_konusu || base.videoId}*\\n> Seviye: ${p.seviye} | Hedef: ${p.hedef_kitle}\\n\\n*⏱️ ${p.sure_ozet}*\\n\\n*🔑 Kavramlar:* ${kavramlar}\\n\\n*📚 Ön bilgi:*\\n${onbilgi}\\n\\n*📝 Özet*\\n${p.ozet}\\n\\n*📖 Konu Anlatımı*\\n${anlatim}\\n\\n*🛠️ Pratik*\\n${pratik}\\n\\n*🧪 Testler*\\n${testler}\\n\\n*🔍 Araştır*\\n${(p.ilgili_konular||[]).map(k=>`- ${k}`).join('\\n')}\\n\\n💬 _Soru sorabilir veya A/B/C/D yazabilirsin._`;\n\nreturn [{ json: {\n  ...base,\n  error: false,\n  output,\n  title:        p.video_konusu || base.videoId,\n  seviye:       p.seviye       || '',\n  ozet:         p.ozet         || '',\n  parsedLesson: p\n}}];"
       },
       "id": "fmt-lesson",
       "name": "Format Lesson",
@@ -518,7 +531,12 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\\n  \"model\": \"openai/gpt-4o-mini\",\\n  \"messages\": [\\n    {\\n      \"role\": \"system\",\\n      \"content\": \"Sen Türkçe konuşan bir eğitim asistanısın. Kullanıcıya videonun içeriğine dayanarak kısa ve net cevap ver. Eğer soru videonun dışındaysa, 'Bu konu videoda geçmiyor' de.\"\\n    },\\n    {\\n      \"role\": \"user\",\\n      \"content\": \"SON VIDEO BAĞLAMI:\\nBaşlık: {{ $json.lastTitle }}\\nÖzet: {{ $json.lastOzet }}\\nDers: {{ $json.lastDers }}\\nKavramlar: {{ $json.lastKavramlar }}\\n\\nKULLANICI SORUSU: {{ $json.msg }}\"\\n    }\\n  ],\\n  \"max_tokens\": 1500,\\n  \"temperature\": 0.4\\n}"
+        "jsonBody": "={\"model\": \"openai/gpt-4o-mini\", \"messages\": [{\"role\": \"system\", \"content\": \"Sen Türkçe konuşan bir eğitim asistanısın. Sana bir kullanıcının niyeti (intent) ve son izlediği videonun bağlamı verilecek.\\n\\nNiyete göre davran:\\n- soru / soru: Kısa ve net cevap ver, bağlamdan çıkıyorsa 'Bu konu videoda geçmiyor' de.\\n- test_iste: Bağlamdan 3 çoktan seçmeli test sorusu üret (A/B/C/D formatında, dogru_cevap ve aciklama ile).\\n- ozet_iste: Videoyu 3-4 paragraf halinde özetle.\\n- sade_anlat: Konuyu sanki ilk kez duyuyormuş gibi, çok basit dille açıkla.\\n- derin_anlat: Konuyu teknik derinlikte, örnekler ve alt kavramlarla açıkla.\\n- ingilizce: Yanıtını İngilizce ver.\\n- cocuk: 5 yaşındaki birine anlatır gibi, basit metaforlarla açıkla.\"}, {\"role\": \"user\", \"content\": \"NİYET: {{ $json.intent }}\\n\\nSON VİDEO BAĞLAMI:\\nBaşlık: {{ $json.lastTitle }}\\nÖzet: {{ $json.lastOzet }}\\nDers: {{ $json.lastDers }}\\nKavramlar: {{ $json.lastKavramlar }}\\n\\nKULLANICI MESAJI: {{ $json.msg }}\"}], \"max_tokens\": 1500, \"temperature\": 0.4}",
+        "options": {
+          "retry": true,
+          "maxTries": 3,
+          "waitBetweenTries": 5000
+        }
       },
       "id": "qa",
       "name": "QA Agent",
@@ -531,7 +549,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst answer = data?.choices?.[0]?.message?.content || data?.message?.content || 'Cevap üretilemedi.';\nconst prev = $('Message Analyze').first().json;\nreturn [{ json: { ...prev, output: answer }}];"
+        "jsCode": "const data   = $input.first().json;\nconst prev   = $('Message Analyze').first().json;\nconst answer = data?.choices?.[0]?.message?.content || data?.message?.content || '';\n\nif (!answer || answer.trim() === '') {\n  return [{ json: { ...prev, output: '⚠️ Cevap üretilemedi. Tekrar deneyin.' }}];\n}\n\nconst intentLabel = {\n  soru:        '💬',\n  test_iste:   '🧪',\n  ozet_iste:   '📝',\n  sade_anlat:  '🟢',\n  derin_anlat: '🔵',\n  ingilizce:   '🇬🇧',\n  cocuk:       '🧒'\n}[prev.intent] || '💬';\n\nreturn [{ json: { ...prev, output: `${intentLabel} ${answer}` }}];"
       },
       "id": "fmt-qa",
       "name": "Format QA",
@@ -544,7 +562,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst tests = data.lastTests || [];\nconst answer = (data.msg || '').trim().toUpperCase().charAt(0);\n\nif (!tests.length) return [{ json: { ...data, output: '❌ Aktif test bulunamadı. Önce bir video analizi yapın.' }}];\n\nlet result = '';\nlet correct = 0;\n\ntests.forEach((q, i) => {\n  const userAns = answer; // Basit: tek harf gönderdiyse ilk soruyu kontrol et\n  const isCorrect = q.dogru_cevap === userAns;\n  if (isCorrect) correct++;\n  result += `*Soru ${i+1}:* ${isCorrect ? '✅ Doğru' : '❌ Yanlış'}\\nCevabın: ${userAns} | Doğru: ${q.dogru_cevap}\\n${q.aciklama}\\n\\n`;\n});\n\nreturn [{ json: { ...data, output: `*Test Değerlendirmesi*\\n\\n${result}Puan: ${correct}/${tests.length}` }}];"
+        "jsCode": "const data  = $input.first().json;\nconst tests = data.lastTests || [];\nconst msg   = (data.msg || '').trim().toUpperCase();\nconst answer = msg.replace(/[^A-D]/g, '').charAt(0);\n\nif (!tests.length) {\n  return [{ json: { ...data, output: '❌ Aktif test bulunamadı. Önce bir YouTube videosu analiz ettirin.' }}];\n}\nif (!answer) {\n  return [{ json: { ...data, output: '⚠️ Geçerli bir seçenek girin: A, B, C veya D' }}];\n}\n\n// Son yanlış cevabı vermediğimiz (veya henüz cevap verilmemiş) ilk soruyu bul\nconst unanswered = tests.find(q => !q._answered);\nconst q = unanswered || tests[0];\n\nconst isCorrect = (q.dogru_cevap || '').toUpperCase() === answer;\n\nconst opts = Object.entries(q.secenekler || {})\n  .map(([k, v]) => `${k === answer ? (isCorrect ? '✅' : '❌') : (k === q.dogru_cevap && !isCorrect ? '✅' : '•')} *${k})* ${v}`)\n  .join('\\n');\n\nconst result = isCorrect\n  ? `✅ *Doğru!*\\n\\n${opts}\\n\\n💡 ${q.aciklama}`\n  : `❌ *Yanlış.* (Senin cevabın: ${answer} | Doğru: ${q.dogru_cevap})\\n\\n${opts}\\n\\n💡 ${q.aciklama}`;\n\n// Sonraki soruyu göster (varsa)\nconst currentIdx = tests.indexOf(q);\nconst nextQ      = tests[currentIdx + 1];\nconst nextHint   = nextQ\n  ? `\\n\\n*Soru ${currentIdx + 2}/${tests.length}:* ${nextQ.soru}\\n\\n${Object.entries(nextQ.secenekler||{}).map(([k,v])=>`*${k})* ${v}`).join('  |  ')}\\n\\nCevabın?`\n  : `\\n\\n🏁 *Tüm sorular tamamlandı!* Yeni bir video analiz etmek için link gönder.`;\n\nreturn [{ json: { ...data, output: `*Soru ${currentIdx + 1}/${tests.length}*\\n\\n${result}${nextHint}` }}];"
       },
       "id": "fmt-test",
       "name": "Format Test",
@@ -581,7 +599,7 @@
           "mode": "id",
           "value": "YOUR_TABLE_ID"
         },
-        "filterByFormula": "={user_id} = \"{{ $json.userId }}\"",
+        "filterByFormula": "{user_id} = \"{{ $json.userId }}\"",
         "options": {
           "sort": [
             {
@@ -622,7 +640,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nlet text = d.output || d.historyMessage || d.helpMessage || 'Tamam.';\n\nif (d.source !== 'telegram') return [{ json: { ...d, response: text }}];\n\nlet html = text\n  .replace(/\\*\\*(.*?)\\*\\*/g, '<b>$1</b>')\n  .replace(/\\`(.*?)\\`/g, '<code>$1</code>')\n  .replace(/\\n/g, '\\n');\n\nif (html.length > 4000) html = html.substring(0,4000)+'...';\nreturn [{ json: { ...d, telegramHtml: html }}];"
+        "jsCode": "const d    = $input.first().json;\nconst text = (d.output || d.historyMessage || d.helpMessage || 'Tamam.').trim();\n\n// Web kaynaklı istekler için düz metin dön\nif (d.source !== 'telegram') {\n  return [{ json: { ...d, telegramHtml: '', response: text }}];\n}\n\n// Telegram HTML dönüşümü\n// Sıra önemli: önce **bold**, sonra *bold*, sonra `code`, sonra spoiler\nlet html = text\n  .replace(/\\*\\*([^*\\n]+)\\*\\*/g,   '<b>$1</b>')\n  .replace(/\\*((?:[^*\\n]|\\n(?!\\n))+)\\*/g, '<b>$1</b>')\n  .replace(/`([^`\\n]+)`/g,          '<code>$1</code>')\n  .replace(/\\|\\|(.+?)\\|\\|/gs,       '<tg-spoiler>$1</tg-spoiler>')\n  .replace(/_([^_\\n]+)_/g,          '<i>$1</i>');\n\n// Telegram'ın 4096 karakter limitini yönet\nif (html.length > 4000) {\n  html = html.substring(0, 3900) + '\\n\\n<i>✂️ [Mesaj kesildi — /history ile tam listeye bak]</i>';\n}\n\nreturn [{ json: { ...d, telegramHtml: html, response: text }}];"
       },
       "id": "fmt-out",
       "name": "Format Output",
@@ -669,6 +687,58 @@
       "position": [
         3080,
         700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "tg-check",
+              "leftValue": "={{ $json.source }}",
+              "rightValue": "telegram",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "is-telegram",
+      "name": "Is Telegram?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "err-t",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "trans-ok",
+      "name": "Transcript OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        180
       ]
     }
   ],
@@ -739,13 +809,6 @@
         ],
         [
           {
-            "node": "QA Agent",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "Format Test",
             "type": "main",
             "index": 0
@@ -761,6 +824,13 @@
         [
           {
             "node": "Get History",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "QA Agent",
             "type": "main",
             "index": 0
           }
@@ -782,7 +852,7 @@
       "main": [
         [
           {
-            "node": "Check Cache",
+            "node": "Transcript OK?",
             "type": "main",
             "index": 0
           }
@@ -921,13 +991,6 @@
             "type": "main",
             "index": 0
           }
-        ],
-        [
-          {
-            "node": "Respond Webhook",
-            "type": "main",
-            "index": 0
-          }
         ]
       ]
     },
@@ -972,13 +1035,6 @@
             "type": "main",
             "index": 0
           }
-        ],
-        [
-          {
-            "node": "Respond Webhook",
-            "type": "main",
-            "index": 0
-          }
         ]
       ]
     },
@@ -1001,17 +1057,21 @@
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Format Output": {
+      "main": [
         [
           {
-            "node": "Respond Webhook",
+            "node": "Is Telegram?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Format Output": {
+    "Is Telegram?": {
       "main": [
         [
           {
@@ -1023,6 +1083,24 @@
         [
           {
             "node": "Respond Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcript OK?": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Cache",
             "type": "main",
             "index": 0
           }
@@ -1046,5 +1124,5 @@
       "name": "Web"
     }
   ],
-  "versionId": "v6-final-2026"
+  "versionId": "v7-final-2026"
 }
