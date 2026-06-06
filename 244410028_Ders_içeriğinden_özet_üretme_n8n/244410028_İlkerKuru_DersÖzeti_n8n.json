@@ -1,5 +1,5 @@
 {
-  "name": "YouTube AI Master - v7 Final",
+  "name": "YouTube içeriğinden özet konu anlatımı test üretme ve hafızalı sohbet",
   "nodes": [
     {
       "parameters": {
@@ -1124,5 +1124,5 @@
       "name": "Web"
     }
   ],
-  "versionId": "v7-final-2026"
+  "versionId": "2026"
 }
